@@ -5,7 +5,7 @@
 ## 会话与状态
 
 **Session**:
-一次某个 Provider 的运行实例，面板的展示单位（一行一个 session）。
+一次某个 Provider 的运行实例，面板的展示单位（一行一个 session）。由 `(Provider, sessionId)` 唯一标识；resume 出的新 sessionId 视作新的 Session，不与旧的拼接续接。
 _Avoid_: 任务、会话窗口
 
 **Working**:
@@ -45,7 +45,7 @@ _Avoid_: 会话文件底座（旧称，ADR-0003 已泛化为不限存储形式�
 WhoNeedsMe 不代替用户向任何 Provider 输入内容——不发消息、不批准权限、不做任何 Agent 侧操作。窗口聚焦跳转（把对应终端带到前台）不算违反只读，因为不涉及向 Agent 输入任何东西。（ADR-0004）
 
 **Alert**:
-Needs You 从 false 变为 true 时触发的前台提醒窗口，用于弥补托盘图标本身不够抓眼球的问题。同一时刻至多一个 Alert；多个 session 同时进入 Waiting 时合并为一个 Alert，不逐个弹出。（ADR-0004）
+Needs You 从 false 变为 true 时触发的前台提醒，形态为一个自绘置顶窗（主提醒）加一条原生系统通知（辅助触达）。同一时刻至多一个 Alert；多个 session 同时进入 Waiting 时合并为一个 Alert，不逐个弹出。（ADR-0004、ADR-0007）
 
 **等待原因**:
 Session 处于 Waiting 时进一步区分究竟在等什么——权限批准 / 回答问题 / 计划确认三选一。用于 Alert 与面板的呈现，帮助用户不用切回终端就能判断该不该现在处理；不等同于对话内容摘要。（ADR-0005）

@@ -32,7 +32,7 @@ GitHub 的 issue 和 PR **共享编号空间**，裸 `#42` 可能是任意一种
 
 ## Sub-issue 与依赖（blocking）关系
 
-`to-issues` 把一份 PRD 拆成子 issue 时，要把每片链到 parent 作 **sub-issue**、把依赖接成 **blocking edge**。GitHub 原生支持（gh CLI v2.94+，2026-06 起的 Issues 2.0）：
+`to-tickets` 把一份 PRD 拆成子 issue 时，要把每片链到 parent 作 **sub-issue**、把依赖接成 **blocking edge**。GitHub 原生支持（gh CLI v2.94+，2026-06 起的 Issues 2.0）：
 
 - **建 issue 时直接挂关系**：
   - `gh issue create --title "..." --body "..." --parent <PARENT-N>`——作为 PARENT-N 的 sub-issue
@@ -45,11 +45,11 @@ GitHub 的 issue 和 PR **共享编号空间**，裸 `#42` 可能是任意一种
   - `gh issue edit <n> --add-blocking <N>` / `--remove-blocking <N>`
 - 编号支持跨仓库 URL；`gh issue view <n>` 会显示 parent / sub-issues（带完成进度）/ blocked-by / blocking。
 
-**旧 gh 不支持原生关系时**，用 issue body 的 `## Parent` 和 `## Blocked by` 段兜底（写 issue 编号引用），`to-issues` 已规定这个 fallback。
+**旧 gh 不支持原生关系时**，用 issue body 的 `## Parent` 和 `## Blocked by` 段兜底（写 issue 编号引用），`to-tickets` 已规定这个 fallback。
 
 ## skill 术语映射
 
 - **"publish to the issue tracker"** → 建一个 GitHub issue：`gh issue create`。
 - **"fetch the relevant ticket"** → `gh issue view <number> --comments`。
-- **"link as a native sub-issue" / "wire a native blocking edge"**（`to-issues`）→ `gh issue create --parent` / `--blocked-by`，或 `gh issue edit --add-sub-issue` / `--add-blocked-by`；不支持就用 body 的 `## Parent` / `## Blocked by` 段兜底。见上"Sub-issue 与依赖关系"段。
+- **"link as a native sub-issue" / "wire a native blocking edge"**（`to-tickets`）→ `gh issue create --parent` / `--blocked-by`，或 `gh issue edit --add-sub-issue` / `--add-blocked-by`；不支持就用 body 的 `## Parent` / `## Blocked by` 段兜底。见上"Sub-issue 与依赖关系"段。
 - **"the spec for this change"**（`code-review` 的 Spec 轴）→ 从 commit / PR 的 issue 引用（`Closes #<n>` / `Part of #<n>` / `Refs #<n>`）找到驱动 issue，读其正文与评论作为 spec。**只到 issue 这一层**——不要回溯 issue 之前的 discussion / 对话记录，那是未收敛的噪声。都没找到就问用户 spec 在哪；用户说没有，Spec 轴报 "no spec available"。
