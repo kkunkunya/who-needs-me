@@ -1,4 +1,7 @@
 
+# === macOS 系统垃圾文件 ===
+.DS_Store
+
 # === 本地状态（机器特定，不入仓）— ADR-0010 ===
 .env
 .claude/skills/
