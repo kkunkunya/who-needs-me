@@ -54,6 +54,7 @@ impl Adapter for ClaudeAdapter {
             context_tokens: None,
             context_usage_percent: None,
         };
+        let mut folded_state = None;
         let mut state = None;
         let mut state_entered_at = None;
         let mut pending_waits = Vec::new();
@@ -86,13 +87,7 @@ impl Adapter for ClaudeAdapter {
                     None
                 };
                 if let Some(event_state) = event_state {
-                    if state != Some(event_state) {
-                        state_entered_at = event
-                            .get("timestamp")
-                            .and_then(Value::as_str)
-                            .and_then(parse_timestamp);
-                    }
-                    state = Some(event_state);
+                    folded_state = Some(event_state);
                 }
                 if let Some(usage) = event.pointer("/message/usage") {
                     let context_tokens = [
@@ -106,6 +101,20 @@ impl Adapter for ClaudeAdapter {
                     metadata.context_tokens = Some(context_tokens);
                 }
                 apply_semantic_waiting_events(&event, &mut pending_waits);
+                let exposed_state = if pending_waits.is_empty() {
+                    folded_state
+                } else {
+                    Some(SessionState::Waiting)
+                };
+                if let Some(exposed_state) = exposed_state {
+                    if state != Some(exposed_state) {
+                        state_entered_at = event
+                            .get("timestamp")
+                            .and_then(Value::as_str)
+                            .and_then(parse_timestamp);
+                    }
+                    state = Some(exposed_state);
+                }
             }
         }
 
@@ -129,11 +138,7 @@ impl Adapter for ClaudeAdapter {
         Ok(Session {
             provider: Self::PROVIDER,
             session_id,
-            state: if waiting_reason.is_some() {
-                SessionState::Waiting
-            } else {
-                state
-            },
+            state,
             state_entered_at,
             waiting_reason,
             metadata,
