@@ -167,6 +167,7 @@ fn has_direct_waiting_tool(event: &Value) -> bool {
         .flatten()
         .any(|block| {
             block.get("type").and_then(Value::as_str) == Some("tool_use")
+                && block.get("id").and_then(Value::as_str).is_some()
                 && matches!(
                     block.get("name").and_then(Value::as_str),
                     Some("AskUserQuestion" | "ExitPlanMode")

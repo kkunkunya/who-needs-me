@@ -55,3 +55,12 @@ fn malformed_and_unknown_input_remains_conservatively_working() {
     assert_eq!(session.waiting_reason, None);
     assert!(!session.needs_you());
 }
+
+#[test]
+fn semantic_tools_without_ids_remain_conservatively_working() {
+    let session = parse_fixture("missing-id-semantic-tools.jsonl");
+
+    assert_eq!(session.state, SessionState::Working);
+    assert_eq!(session.waiting_reason, None);
+    assert!(!session.needs_you());
+}
