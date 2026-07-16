@@ -1,3 +1,5 @@
+use std::time::{Duration, SystemTime};
+
 /// A supported coding-agent CLI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Provider {
@@ -56,6 +58,8 @@ pub struct Session {
     pub provider: Provider,
     pub session_id: String,
     pub state: SessionState,
+    /// Direct provider time for entering `state`; absent when the source cannot recover it.
+    pub state_entered_at: Option<SystemTime>,
     pub waiting_reason: Option<WaitingReason>,
     pub metadata: SessionMetadata,
 }
@@ -71,4 +75,18 @@ impl Session {
     pub fn needs_you(&self) -> bool {
         self.state == SessionState::Waiting
     }
+}
+
+/// One Session as presented by the Engine's panel seam.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PanelSession {
+    pub session: Session,
+    pub elapsed: Duration,
+}
+
+/// The complete Engine snapshot consumed by panel-like surfaces.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PanelSnapshot {
+    pub sessions: Vec<PanelSession>,
+    pub needs_you: bool,
 }

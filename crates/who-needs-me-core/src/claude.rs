@@ -2,8 +2,10 @@ use std::{
     fs::{self, File},
     io::{BufRead, BufReader},
     path::Path,
+    time::SystemTime,
 };
 
+use chrono::DateTime;
 use serde_json::Value;
 
 use crate::{
@@ -52,7 +54,8 @@ impl Adapter for ClaudeAdapter {
             context_tokens: None,
             context_usage_percent: None,
         };
-        let mut state = SessionState::Working;
+        let mut state = None;
+        let mut state_entered_at = None;
 
         for line in BufReader::new(file).lines() {
             let line = line.map_err(|source| CoreError::ReadPath {
@@ -63,8 +66,9 @@ impl Adapter for ClaudeAdapter {
                 replace_json_string(&mut metadata.cwd, event.get("cwd"));
                 replace_json_string(&mut metadata.git_branch, event.get("gitBranch"));
                 replace_json_string(&mut metadata.model, event.pointer("/message/model"));
-                if event.get("type").and_then(Value::as_str) == Some("assistant") {
-                    state = if has_direct_waiting_tool(&event) {
+                let event_state = if event.get("type").and_then(Value::as_str) == Some("assistant")
+                {
+                    Some(if has_direct_waiting_tool(&event) {
                         SessionState::Waiting
                     } else {
                         match event
@@ -74,9 +78,20 @@ impl Adapter for ClaudeAdapter {
                             Some("end_turn") => SessionState::Idle,
                             _ => SessionState::Working,
                         }
-                    };
+                    })
                 } else if event.get("type").and_then(Value::as_str) == Some("user") {
-                    state = SessionState::Working;
+                    Some(SessionState::Working)
+                } else {
+                    None
+                };
+                if let Some(event_state) = event_state {
+                    if state != Some(event_state) {
+                        state_entered_at = event
+                            .get("timestamp")
+                            .and_then(Value::as_str)
+                            .and_then(parse_timestamp);
+                    }
+                    state = Some(event_state);
                 }
                 if let Some(usage) = event.pointer("/message/usage") {
                     let context_tokens = [
@@ -105,15 +120,23 @@ impl Adapter for ClaudeAdapter {
                 .map(|parent| parent.to_string_lossy().into_owned());
         }
         metadata.cwd_display = metadata.cwd.as_deref().map(display_cwd);
+        let state = state.unwrap_or(SessionState::Working);
 
         Ok(Session {
             provider: Self::PROVIDER,
             session_id,
             state,
+            state_entered_at,
             waiting_reason: None,
             metadata,
         })
     }
+}
+
+fn parse_timestamp(timestamp: &str) -> Option<SystemTime> {
+    DateTime::parse_from_rfc3339(timestamp)
+        .ok()
+        .map(SystemTime::from)
 }
 
 fn display_cwd(cwd: &str) -> String {
