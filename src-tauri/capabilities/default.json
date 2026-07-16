@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Read-only core capabilities for the session debug window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

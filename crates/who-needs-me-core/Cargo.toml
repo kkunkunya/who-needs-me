@@ -1,0 +1,8 @@
+[package]
+name = "who-needs-me-core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "who_needs_me_core"
+path = "src/lib.rs"

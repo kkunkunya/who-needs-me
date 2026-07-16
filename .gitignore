@@ -7,3 +7,10 @@
 .claude/skills/
 .codex/skills/
 .agents/skills/
+
+# === 构建产物 ===
+/dist/
+/node_modules/
+/target/
+/src-tauri/target/
+/src-tauri/gen/
