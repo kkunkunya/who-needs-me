@@ -112,10 +112,10 @@ impl Engine {
             let key = session.key();
             let tracked = panel_state.entry(key).or_insert_with(|| TrackedSession {
                 session: session.clone(),
-                state_since: now,
+                state_since: session.state_entered_at.unwrap_or(now),
             });
             if tracked.session.state != session.state {
-                tracked.state_since = now;
+                tracked.state_since = session.state_entered_at.unwrap_or(now);
             }
             tracked.session = session;
         }
@@ -123,6 +123,7 @@ impl Engine {
         for (key, tracked) in panel_state.iter_mut() {
             if !live_keys.contains(key) && tracked.session.state != SessionState::Ended {
                 tracked.session.state = SessionState::Ended;
+                tracked.session.state_entered_at = Some(now);
                 tracked.session.waiting_reason = None;
                 tracked.state_since = now;
             }

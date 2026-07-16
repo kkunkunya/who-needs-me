@@ -1,4 +1,8 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    path::Path,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use who_needs_me_core::{
     Adapter, ClaudeAdapter, CoreResult, Engine, Environment, ProcessProbe, Provider,
@@ -55,6 +59,7 @@ impl Adapter for SyntheticAdapter {
             provider: SYNTHETIC_PROVIDER,
             session_id: "synthetic-session".into(),
             state: SessionState::Idle,
+            state_entered_at: None,
             waiting_reason: None,
             metadata: SessionMetadata {
                 cwd: Some("/fixtures/synthetic".into()),
@@ -108,6 +113,7 @@ fn fixture_environment_only_lists_live_claude_sessions() {
             provider: ClaudeAdapter::PROVIDER,
             session_id: "session-alpha".into(),
             state: SessionState::Idle,
+            state_entered_at: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_784_109_601),),
             waiting_reason: None,
             metadata: SessionMetadata {
                 cwd: Some("/fixtures/project-alpha".into()),

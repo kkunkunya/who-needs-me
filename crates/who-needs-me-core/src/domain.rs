@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 /// A supported coding-agent CLI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -58,6 +58,8 @@ pub struct Session {
     pub provider: Provider,
     pub session_id: String,
     pub state: SessionState,
+    /// Direct provider time for entering `state`; absent when the source cannot recover it.
+    pub state_entered_at: Option<SystemTime>,
     pub waiting_reason: Option<WaitingReason>,
     pub metadata: SessionMetadata,
 }

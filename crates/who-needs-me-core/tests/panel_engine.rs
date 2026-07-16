@@ -100,15 +100,28 @@ impl Fixture {
                 provider: PROVIDER,
                 session_id: session_id.into(),
                 state,
+                state_entered_at: None,
                 waiting_reason: None,
                 metadata: SessionMetadata {
                     cwd: Some(cwd.into()),
+                    cwd_display: None,
                     git_branch: None,
                     model: None,
+                    context_tokens: None,
                     context_usage_percent: None,
                 },
             },
         );
+    }
+
+    fn set_state_entered_at(&self, session_id: &str, state_entered_at: SystemTime) {
+        self.sessions
+            .lock()
+            .expect("fixture sessions lock")
+            .values_mut()
+            .find(|session| session.session_id == session_id)
+            .expect("fixture session should exist")
+            .state_entered_at = Some(state_entered_at);
     }
 
     fn engine(&self) -> Engine {
@@ -275,6 +288,33 @@ fn elapsed_tracks_time_since_the_current_state_transition() {
         .collect_panel_at(&environment, started_at + Duration::from_secs(14))
         .expect("waiting panel should be collected");
     assert_eq!(waiting_panel.sessions[0].elapsed, Duration::from_secs(4));
+}
+
+#[test]
+fn cold_start_and_restart_preserve_elapsed_from_the_direct_state_timestamp() {
+    let observed_at = SystemTime::UNIX_EPOCH + Duration::from_secs(10_000);
+    let waiting_since = observed_at - Duration::from_secs(30 * 60);
+    let mut fixture = Fixture::new();
+    fixture.add_session(
+        "already-waiting",
+        "/work/waiting",
+        SessionState::Waiting,
+        observed_at,
+    );
+    fixture.set_state_entered_at("already-waiting", waiting_since);
+    let environment = fixture.environment([("/work/waiting", 1)]);
+
+    let cold_start = fixture
+        .engine()
+        .collect_panel_at(&environment, observed_at)
+        .expect("cold-start panel should be collected");
+    let restarted = fixture
+        .engine()
+        .collect_panel_at(&environment, observed_at)
+        .expect("restarted panel should be collected");
+
+    assert_eq!(cold_start.sessions[0].elapsed, Duration::from_secs(30 * 60));
+    assert_eq!(restarted.sessions[0].elapsed, Duration::from_secs(30 * 60));
 }
 
 #[test]

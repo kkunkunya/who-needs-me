@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    time::{Duration, SystemTime},
+};
 
 use who_needs_me_core::{Adapter, ClaudeAdapter, SessionArtifact, SessionState};
 
@@ -75,6 +78,10 @@ fn unresolved_question_tool_is_waiting_from_a_direct_session_signal() {
         .expect("waiting Claude fixture should parse");
 
     assert_eq!(session.state, SessionState::Waiting);
+    assert_eq!(
+        session.state_entered_at,
+        Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_784_118_601))
+    );
     assert!(session.needs_you());
     assert_eq!(session.waiting_reason, None);
 }
