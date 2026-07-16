@@ -44,8 +44,10 @@ pub enum WaitingReason {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SessionMetadata {
     pub cwd: Option<String>,
+    pub cwd_display: Option<String>,
     pub git_branch: Option<String>,
     pub model: Option<String>,
+    pub context_tokens: Option<u64>,
     pub context_usage_percent: Option<f32>,
 }
 

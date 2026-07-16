@@ -26,8 +26,10 @@ struct SessionView {
 #[serde(rename_all = "camelCase")]
 struct SessionMetadataView {
     cwd: Option<String>,
+    cwd_display: Option<String>,
     git_branch: Option<String>,
     model: Option<String>,
+    context_tokens: Option<u64>,
     context_usage_percent: Option<f32>,
 }
 
@@ -148,8 +150,10 @@ fn waiting_reason_label(reason: WaitingReason) -> &'static str {
 fn metadata_view(metadata: SessionMetadata) -> SessionMetadataView {
     SessionMetadataView {
         cwd: metadata.cwd,
+        cwd_display: metadata.cwd_display,
         git_branch: metadata.git_branch,
         model: metadata.model,
+        context_tokens: metadata.context_tokens,
         context_usage_percent: metadata.context_usage_percent,
     }
 }
