@@ -15,6 +15,8 @@ WhoNeedsMe 是一个本机只读状态托盘应用（Tauri，macOS 优先）。�
 
 本契约覆盖这三个 surface 的跨界面稳定规则。产品语义见 `CONTEXT.md` 与 Spec #3；背景决策见 `docs/adr/`。
 
+开发期另允许一个 **throwaway Session Debug Surface**：只用于 walking skeleton 验证本地 Engine → Tauri command → WebView 数据通道，不属于上述 V1 产品 surface，也不承诺成品 Panel 的 anatomy、组件、交互或视觉 fidelity。
+
 ## 设计原则
 
 - **单一强调色只服务 Needs-You。** 琥珀/amber 是全应用唯一强调色，**只用于**"需要你"（Waiting 状态、等待原因、Needs-You 高亮、Alert），**永不做装饰**。Working/Idle/Ended 一律中性灰。这是最硬的不变量——它让强调色一出现就等于"该你了"。
@@ -86,10 +88,11 @@ surface 数量少，只有一个真正的"列表页面"家族；Alert 与 Tray �
 | Session Panel | Panel | 一眼看清谁在等我 + 全局 | `[header: 猫头像 / N sessions / 快捷键 / 设置] → [pinned Waiting 行] → [其余行] → [footer: Updated / View all]` | 无 | 合成会话数据目录（Spec #3 seam） |
 | Alert Card | —（独立 surface） | 把"有人等你"推到眼前 | `[会反应的猫] [标题] [Open panel]` | 1 vs N session 文案 | 同上，构造 ≥1 Waiting |
 | Tray Icon | —（独立 surface） | 常驻聚合信号 | `[cat glyph + 聚合态]` | calm / working / attention 三态 | 同上 |
+| Session Debug Surface（开发期例外） | —（throwaway，不属于 V1 页面族） | 验证本地只读 Session 数据通道 | `[debug heading / session count] → [provider + project identity + 占位元数据/状态的原始列表]` | 仅允许中性 token、无成品组件/交互/amber、后续由 Session Panel 替换 | `crates/who-needs-me-core/tests/fixtures/claude`（mixed）+ 空会话根（empty） |
 
 ## 例外与变更协议
 
-- 暂无 route 例外（单 surface 家族）。
+- **开发期 route/surface 例外**：Issue #4 的 `Session Debug Surface` 可作为 Tauri 主窗口临时存在，只验证可启动、托盘常驻、fixture 行数/identity、本地只读边界与 neutral token 对齐；不得把它当作 Session Panel 设计证据，也不得为它引入新的共享组件、交互模式、page family 或视觉 token。完成成品 Session Panel 后删除该例外与 throwaway surface。
 - 新增 Provider 时 `ProviderGlyph` 加一个单色 variant，不改行结构；新增强调用途前先回本契约确认（强调色只服务 Needs-You 的不变量优先）。
 - light 主题、灵动岛/顶栏留待 post-V1；届时刷新本契约而非就地加值。
 
@@ -105,3 +108,4 @@ UI 层无自动化 seam（Spec #3 规定 UI 走人工验收），用固定截图
 | Alert Card | 卡片 | 1 session（含具体原因） | 单 Waiting fixture | _待截图_ |
 | Alert Card | 卡片 | N sessions（合并文案） | 多 Waiting fixture | _待截图_ |
 | Tray Icon | 菜单栏 | calm / attention | 有/无 Waiting | _待截图_ |
+| Session Debug Surface（开发期例外） | Tauri 主窗口 | mixed / empty | 合成 Claude fixture / 空会话根；运行 `npm test`、`npm run build:ui`、Tauri check，并分别启动 fixture 验证行数/identity 与空列表 | PR 验证评论（不进入 V1 成品截图证据） |

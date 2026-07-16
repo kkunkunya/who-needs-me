@@ -5,16 +5,22 @@ use std::{
 };
 
 use crate::{
-    Adapter, CoreError, CoreResult, Provider, Session, SessionArtifact, SessionMetadata,
-    SessionState,
+    Adapter, CoreError, CoreResult, Provider, ProviderDescriptor, Session, SessionArtifact,
+    SessionMetadata, SessionState,
 };
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ClaudeAdapter;
 
+impl ClaudeAdapter {
+    pub const PROVIDER: Provider = Provider::new("claude", "Claude");
+    pub const DESCRIPTOR: ProviderDescriptor =
+        ProviderDescriptor::new(Self::PROVIDER, "claude", ".claude/projects", "claude");
+}
+
 impl Adapter for ClaudeAdapter {
-    fn provider(&self) -> Provider {
-        Provider::Claude
+    fn descriptor(&self) -> ProviderDescriptor {
+        Self::DESCRIPTOR
     }
 
     fn discover(&self, session_data_root: &Path) -> CoreResult<Vec<SessionArtifact>> {
@@ -63,7 +69,7 @@ impl Adapter for ClaudeAdapter {
         }
 
         Ok(Session {
-            provider: Provider::Claude,
+            provider: Self::PROVIDER,
             session_id,
             // The walking skeleton deliberately avoids guessing Needs You.
             state: SessionState::Idle,

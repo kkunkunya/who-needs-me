@@ -5,23 +5,84 @@ use std::{
     sync::Arc,
 };
 
-use crate::{CoreError, CoreResult, Provider};
+use crate::{CoreError, CoreResult, Provider, ProviderDescriptor};
 
 /// The OS boundary used to decide whether a Provider process is still alive.
 pub trait ProcessProbe: Send + Sync {
-    fn is_alive(&self, provider: Provider, cwd: &Path) -> bool;
+    fn is_alive(&self, provider: ProviderDescriptor, cwd: &Path) -> bool;
+}
+
+/// A snapshot of process working directories, isolated for deterministic probing.
+pub trait ProcessTable: Send + Sync {
+    fn process_cwds(&self, executable: &str) -> Vec<PathBuf>;
 }
 
 /// Production probe. V1 is macOS-first, where `pgrep` is available.
-#[derive(Debug, Default)]
-pub struct SystemProcessProbe;
+pub struct SystemProcessProbe {
+    process_table: Arc<dyn ProcessTable>,
+}
+
+impl Default for SystemProcessProbe {
+    fn default() -> Self {
+        Self {
+            process_table: Arc::new(MacOsProcessTable),
+        }
+    }
+}
+
+impl SystemProcessProbe {
+    pub fn with_process_table(process_table: Arc<dyn ProcessTable>) -> Self {
+        Self { process_table }
+    }
+}
 
 impl ProcessProbe for SystemProcessProbe {
-    fn is_alive(&self, provider: Provider, _cwd: &Path) -> bool {
-        Command::new("pgrep")
-            .args(["-x", provider.process_name()])
-            .status()
-            .is_ok_and(|status| status.success())
+    fn is_alive(&self, provider: ProviderDescriptor, cwd: &Path) -> bool {
+        !cwd.as_os_str().is_empty()
+            && self
+                .process_table
+                .process_cwds(provider.executable())
+                .iter()
+                .any(|process_cwd| paths_match(process_cwd, cwd))
+    }
+}
+
+struct MacOsProcessTable;
+
+impl ProcessTable for MacOsProcessTable {
+    fn process_cwds(&self, executable: &str) -> Vec<PathBuf> {
+        let Ok(processes) = Command::new("pgrep").args(["-x", executable]).output() else {
+            return Vec::new();
+        };
+        if !processes.status.success() {
+            return Vec::new();
+        }
+
+        String::from_utf8_lossy(&processes.stdout)
+            .lines()
+            .filter_map(|pid| process_cwd(pid.trim()))
+            .collect()
+    }
+}
+
+fn process_cwd(pid: &str) -> Option<PathBuf> {
+    if pid.is_empty() {
+        return None;
+    }
+    let output = Command::new("lsof")
+        .args(["-a", "-p", pid, "-d", "cwd", "-Fn"])
+        .output()
+        .ok()?;
+    output.status.success().then_some(())?;
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find_map(|line| line.strip_prefix('n').map(PathBuf::from))
+}
+
+fn paths_match(left: &Path, right: &Path) -> bool {
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
     }
 }
 
@@ -42,24 +103,19 @@ impl Environment {
     }
 
     /// Real local paths and a real process probe used when no fixture is injected.
-    pub fn production() -> CoreResult<Self> {
+    pub fn production(providers: impl IntoIterator<Item = ProviderDescriptor>) -> CoreResult<Self> {
         let home = std::env::var_os("HOME")
             .map(PathBuf::from)
             .ok_or(CoreError::MissingHomeDirectory)?;
         let hook_base = home.join(".who-needs-me/hooks");
-
-        Self::builder(Arc::new(SystemProcessProbe))
-            .with_session_data_root(Provider::Claude, home.join(".claude/projects"))
-            .with_hook_event_root(
-                Provider::Claude,
-                hook_base.join(Provider::Claude.directory_name()),
-            )
-            .with_session_data_root(Provider::Codex, home.join(".codex/sessions"))
-            .with_hook_event_root(
-                Provider::Codex,
-                hook_base.join(Provider::Codex.directory_name()),
-            )
-            .build()
+        let mut builder = Self::builder(Arc::new(SystemProcessProbe::default()));
+        for descriptor in providers {
+            let provider = descriptor.provider();
+            builder = builder
+                .with_session_data_root(provider, descriptor.session_data_root(&home))
+                .with_hook_event_root(provider, descriptor.hook_event_root(&hook_base));
+        }
+        builder.build()
     }
 
     pub fn session_data_root(&self, provider: Provider) -> CoreResult<&Path> {
@@ -112,5 +168,48 @@ impl EnvironmentBuilder {
             hook_event_roots: self.hook_event_roots,
             process_probe: self.process_probe,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, sync::Arc};
+
+    use super::{ProcessProbe, ProcessTable, SystemProcessProbe};
+    use crate::{Provider, ProviderDescriptor};
+
+    struct ControlledProcessTable {
+        executable: &'static str,
+        cwd: PathBuf,
+    }
+
+    impl ProcessTable for ControlledProcessTable {
+        fn process_cwds(&self, executable: &str) -> Vec<PathBuf> {
+            if executable == self.executable {
+                vec![self.cwd.clone()]
+            } else {
+                Vec::new()
+            }
+        }
+    }
+
+    #[test]
+    fn production_probe_does_not_keep_a_historical_session_alive() {
+        let probe = SystemProcessProbe::with_process_table(Arc::new(ControlledProcessTable {
+            executable: "claude",
+            cwd: PathBuf::from("/work/live-session"),
+        }));
+        let provider = ProviderDescriptor::new(
+            Provider::new("claude", "Claude"),
+            "claude",
+            ".claude/projects",
+            "claude",
+        );
+
+        assert!(probe.is_alive(provider, PathBuf::from("/work/live-session").as_path()));
+        assert!(!probe.is_alive(
+            provider,
+            PathBuf::from("/work/historical-session").as_path()
+        ));
     }
 }

@@ -1,4 +1,3 @@
-type Provider = "Claude" | "Codex";
 type SessionState = "working" | "waiting" | "idle" | "ended";
 type WaitingReason = "permissionApproval" | "answerQuestion" | "confirmPlan";
 
@@ -10,7 +9,7 @@ interface SessionMetadata {
 }
 
 interface Session {
-  provider: Provider;
+  provider: string;
   sessionId: string;
   state: SessionState;
   waitingReason: WaitingReason | null;

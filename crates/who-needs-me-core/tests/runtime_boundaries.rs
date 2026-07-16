@@ -36,6 +36,9 @@ fn runtime_surfaces_are_local_and_read_only() {
     }
 
     assert!(DEBUG_UI.contains(r#"invoke<Session[]>("list_sessions")"#));
+    assert!(DEBUG_UI.contains("provider: string;"));
+    assert!(!DEBUG_UI.contains(r#""Claude" | "Codex""#));
+    assert!(!APP_BRIDGE.contains("fn provider_label"));
     for forbidden_web_api in ["fetch(", "WebSocket", "XMLHttpRequest", "EventSource"] {
         assert!(!DEBUG_UI.contains(forbidden_web_api));
     }

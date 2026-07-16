@@ -1,23 +1,21 @@
 /// A supported coding-agent CLI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Provider {
-    Claude,
-    Codex,
+pub struct Provider {
+    id: &'static str,
+    display_name: &'static str,
 }
 
 impl Provider {
-    pub(crate) fn process_name(self) -> &'static str {
-        match self {
-            Self::Claude => "claude",
-            Self::Codex => "codex",
-        }
+    pub const fn new(id: &'static str, display_name: &'static str) -> Self {
+        Self { id, display_name }
     }
 
-    pub(crate) fn directory_name(self) -> &'static str {
-        match self {
-            Self::Claude => "claude",
-            Self::Codex => "codex",
-        }
+    pub const fn id(self) -> &'static str {
+        self.id
+    }
+
+    pub const fn display_name(self) -> &'static str {
+        self.display_name
     }
 }
 

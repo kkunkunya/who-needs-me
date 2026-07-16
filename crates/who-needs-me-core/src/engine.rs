@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, path::Path};
 
-use crate::{Adapter, CoreError, CoreResult, Environment, Session, SessionKey, SessionState};
+use crate::{Adapter, CoreError, CoreResult, Environment, Session, SessionKey};
 
 pub struct Engine {
     adapters: Vec<Box<dyn Adapter>>,
@@ -15,18 +15,18 @@ impl Engine {
         let mut sessions = BTreeMap::<SessionKey, Session>::new();
 
         for adapter in &self.adapters {
-            let root = environment.session_data_root(adapter.provider())?;
+            let descriptor = adapter.descriptor();
+            let root = environment.session_data_root(descriptor.provider())?;
             for artifact in adapter.discover(root)? {
-                let mut session = adapter.parse(&artifact)?;
+                let session = adapter.parse(&artifact)?;
                 let cwd = session
                     .metadata
                     .cwd
                     .as_deref()
                     .map(Path::new)
                     .unwrap_or_else(|| Path::new(""));
-                if !environment.process_probe().is_alive(session.provider, cwd) {
-                    session.state = SessionState::Ended;
-                    session.waiting_reason = None;
+                if !environment.process_probe().is_alive(descriptor, cwd) {
+                    continue;
                 }
 
                 let key = session.key();

@@ -3,8 +3,8 @@ use std::{path::Path, sync::Arc};
 use serde::Serialize;
 use tauri::{State, image::Image, tray::TrayIconBuilder};
 use who_needs_me_core::{
-    ClaudeAdapter, CoreResult, Engine, Environment, ProcessProbe, Provider, Session,
-    SessionMetadata, SessionState, WaitingReason,
+    Adapter, ClaudeAdapter, CoreResult, Engine, Environment, ProcessProbe, ProviderDescriptor,
+    Session, SessionMetadata, SessionState, WaitingReason,
 };
 
 struct AppState {
@@ -34,7 +34,7 @@ struct SessionMetadataView {
 impl From<Session> for SessionView {
     fn from(session: Session) -> Self {
         Self {
-            provider: provider_label(session.provider),
+            provider: session.provider.display_name(),
             session_id: session.session_id,
             state: state_label(session.state),
             waiting_reason: session.waiting_reason.map(waiting_reason_label),
@@ -53,9 +53,11 @@ fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionView>, String>
 }
 
 pub fn run() {
-    let environment = runtime_environment().expect("WhoNeedsMe environment should be available");
+    let adapters: Vec<Box<dyn Adapter>> = vec![Box::new(ClaudeAdapter)];
+    let environment =
+        runtime_environment(&adapters).expect("WhoNeedsMe environment should be available");
     let state = AppState {
-        engine: Engine::new(vec![Box::new(ClaudeAdapter)]),
+        engine: Engine::new(adapters),
         environment,
     };
 
@@ -80,9 +82,9 @@ pub fn run() {
         .expect("error while running WhoNeedsMe");
 }
 
-fn runtime_environment() -> CoreResult<Environment> {
+fn runtime_environment(adapters: &[Box<dyn Adapter>]) -> CoreResult<Environment> {
     let Some(fixture_root) = std::env::var_os("WHO_NEEDS_ME_FIXTURE_ROOT") else {
-        return Environment::production();
+        return Environment::production(adapters.iter().map(|adapter| adapter.descriptor()));
     };
     let fixture_root = std::path::PathBuf::from(fixture_root);
     let fixture_root = if fixture_root.is_absolute() {
@@ -93,16 +95,20 @@ fn runtime_environment() -> CoreResult<Environment> {
             .join(fixture_root)
     };
 
-    Environment::builder(Arc::new(FixtureProcessProbe))
-        .with_session_data_root(Provider::Claude, fixture_root.join("sessions"))
-        .with_hook_event_root(Provider::Claude, fixture_root.join("hooks"))
-        .build()
+    let mut builder = Environment::builder(Arc::new(FixtureProcessProbe));
+    for adapter in adapters {
+        let provider = adapter.descriptor().provider();
+        builder = builder
+            .with_session_data_root(provider, fixture_root.join("sessions"))
+            .with_hook_event_root(provider, fixture_root.join("hooks"));
+    }
+    builder.build()
 }
 
 struct FixtureProcessProbe;
 
 impl ProcessProbe for FixtureProcessProbe {
-    fn is_alive(&self, _provider: Provider, _cwd: &Path) -> bool {
+    fn is_alive(&self, _provider: ProviderDescriptor, _cwd: &Path) -> bool {
         true
     }
 }
@@ -120,13 +126,6 @@ fn placeholder_tray_icon() -> Image<'static> {
         }
     }
     Image::new_owned(rgba, SIZE, SIZE)
-}
-
-fn provider_label(provider: Provider) -> &'static str {
-    match provider {
-        Provider::Claude => "Claude",
-        Provider::Codex => "Codex",
-    }
 }
 
 fn state_label(state: SessionState) -> &'static str {
