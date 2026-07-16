@@ -9,3 +9,16 @@
 - 只读、本地运行——不接管、不编排、不保存对话
 
 🚧 早期开发中（work in progress）。
+
+## Walking skeleton
+
+V1 地基由一个纯 Rust core crate、Tauri v2 壳和静态 TypeScript 调试列表组成。前端在启动前编译为 `dist/`，Tauri 直接加载静态资源；项目不启动 Vite、本地 HTTP 或 socket 服务。
+
+```sh
+npm install
+cargo install tauri-cli --version "^2.0.0" --locked
+cargo test
+WHO_NEEDS_ME_FIXTURE_ROOT=crates/who-needs-me-core/tests/fixtures/claude cargo tauri dev
+```
+
+不设置 `WHO_NEEDS_ME_FIXTURE_ROOT` 时，生产 `Environment` 默认读取 Claude/Codex 的官方本机会话根，并使用真实进程存活探针；测试与手工验收可显式注入 fixture 根和受控探针。

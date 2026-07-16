@@ -1,0 +1,15 @@
+{
+  "name": "who-needs-me",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:ui": "node scripts/prepare-ui.mjs && tsc --project tsconfig.json",
+    "check:ui": "tsc --project tsconfig.json --noEmit",
+    "check:design": "node scripts/check-design-contract.mjs",
+    "test": "npm run check:ui && npm run check:design"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

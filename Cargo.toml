@@ -1,0 +1,5 @@
+[workspace]
+members = ["crates/who-needs-me-core"]
+default-members = ["crates/who-needs-me-core"]
+exclude = ["src-tauri"]
+resolver = "2"

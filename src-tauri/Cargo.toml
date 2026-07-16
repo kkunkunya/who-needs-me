@@ -1,0 +1,17 @@
+[package]
+name = "who-needs-me"
+version = "0.1.0"
+description = "A read-only local status board for coding agents"
+edition = "2024"
+
+[lib]
+name = "who_needs_me_app"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = ["tray-icon"] }
+who-needs-me-core = { path = "../crates/who-needs-me-core" }

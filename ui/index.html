@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>WhoNeedsMe · Session Debug</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="debug-shell" aria-labelledby="debug-title">
+      <header class="debug-header">
+        <div>
+          <p class="eyebrow">Walking skeleton</p>
+          <h1 id="debug-title">Discovered sessions</h1>
+        </div>
+        <output id="session-count" aria-live="polite">Loading…</output>
+      </header>
+
+      <p class="debug-note">
+        Read-only developer view. State and waiting metadata are placeholders in this slice.
+      </p>
+
+      <ul id="session-list" class="session-list" aria-label="Discovered sessions"></ul>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

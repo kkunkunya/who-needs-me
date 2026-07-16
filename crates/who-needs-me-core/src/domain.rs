@@ -1,0 +1,74 @@
+/// A supported coding-agent CLI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Provider {
+    Claude,
+    Codex,
+}
+
+impl Provider {
+    pub(crate) fn process_name(self) -> &'static str {
+        match self {
+            Self::Claude => "claude",
+            Self::Codex => "codex",
+        }
+    }
+
+    pub(crate) fn directory_name(self) -> &'static str {
+        match self {
+            Self::Claude => "claude",
+            Self::Codex => "codex",
+        }
+    }
+}
+
+/// The stable primary key for a session.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SessionKey {
+    pub provider: Provider,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionState {
+    Working,
+    Waiting,
+    Idle,
+    Ended,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WaitingReason {
+    PermissionApproval,
+    AnswerQuestion,
+    ConfirmPlan,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SessionMetadata {
+    pub cwd: Option<String>,
+    pub git_branch: Option<String>,
+    pub model: Option<String>,
+    pub context_usage_percent: Option<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Session {
+    pub provider: Provider,
+    pub session_id: String,
+    pub state: SessionState,
+    pub waiting_reason: Option<WaitingReason>,
+    pub metadata: SessionMetadata,
+}
+
+impl Session {
+    pub fn key(&self) -> SessionKey {
+        SessionKey {
+            provider: self.provider,
+            session_id: self.session_id.clone(),
+        }
+    }
+
+    pub fn needs_you(&self) -> bool {
+        self.state == SessionState::Waiting
+    }
+}
