@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use who_needs_me_core::{Adapter, ClaudeAdapter, SessionArtifact, SessionState};
+use who_needs_me_core::{Adapter, ClaudeAdapter, SessionArtifact, SessionState, WaitingReason};
 
 fn fixture(name: &str) -> SessionArtifact {
     SessionArtifact::from_path(
@@ -83,7 +83,7 @@ fn unresolved_question_tool_is_waiting_from_a_direct_session_signal() {
         Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_784_118_601))
     );
     assert!(session.needs_you());
-    assert_eq!(session.waiting_reason, None);
+    assert_eq!(session.waiting_reason, Some(WaitingReason::AnswerQuestion));
 }
 
 #[test]
