@@ -58,3 +58,9 @@ fn runtime_surfaces_are_local_and_read_only() {
     }
     assert!(!DEBUG_CSS.to_uppercase().contains("#E39B3E"));
 }
+
+#[test]
+fn production_runtime_registers_both_builtin_adapters() {
+    assert!(APP_BRIDGE.contains("Box::new(ClaudeAdapter)"));
+    assert!(APP_BRIDGE.contains("Box::new(CodexAdapter)"));
+}

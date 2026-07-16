@@ -3,8 +3,8 @@ use std::{path::Path, sync::Arc};
 use serde::Serialize;
 use tauri::{State, image::Image, tray::TrayIconBuilder};
 use who_needs_me_core::{
-    Adapter, ClaudeAdapter, CoreResult, Engine, Environment, ProcessProbe, ProviderDescriptor,
-    Session, SessionMetadata, SessionState, WaitingReason,
+    Adapter, ClaudeAdapter, CodexAdapter, CoreResult, Engine, Environment, ProcessProbe,
+    ProviderDescriptor, Session, SessionMetadata, SessionState, WaitingReason,
 };
 
 struct AppState {
@@ -55,7 +55,7 @@ fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionView>, String>
 }
 
 pub fn run() {
-    let adapters: Vec<Box<dyn Adapter>> = vec![Box::new(ClaudeAdapter)];
+    let adapters: Vec<Box<dyn Adapter>> = vec![Box::new(ClaudeAdapter), Box::new(CodexAdapter)];
     let environment =
         runtime_environment(&adapters).expect("WhoNeedsMe environment should be available");
     let state = AppState {

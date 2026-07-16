@@ -1,0 +1,8 @@
+not-json
+{"timestamp":"2026-07-15T00:30:01Z","type":"session_meta","payload":{"id":"codex-format-drift","originator":"codex-tui","cwd":"/work/drift","git":{"branch":"main"}}}
+{"timestamp":"2026-07-15T00:30:02Z","type":"turn_context","payload":{"cwd":"/work/drift","model":"gpt-known-before-drift"}}
+{"timestamp":"2026-07-15T00:30:03Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":1000},"model_context_window":2000}}}
+{"timestamp":"2026-07-15T00:30:04Z","type":"event_msg","payload":{"type":"task_complete"}}
+{"timestamp":"2026-07-15T00:30:05Z","type":"turn_context","payload":{"model":{"unexpected":"shape"}}}
+{"timestamp":"2026-07-15T00:30:06Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":"unexpected"}}}
+{"timestamp":"2026-07-15T00:30:07Z","type":"event_msg","payload":{"type":"future_lifecycle_shape"}}
