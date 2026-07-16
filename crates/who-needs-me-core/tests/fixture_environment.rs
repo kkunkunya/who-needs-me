@@ -58,8 +58,10 @@ impl Adapter for SyntheticAdapter {
             waiting_reason: None,
             metadata: SessionMetadata {
                 cwd: Some("/fixtures/synthetic".into()),
+                cwd_display: None,
                 git_branch: None,
                 model: None,
+                context_tokens: None,
                 context_usage_percent: None,
             },
         })
@@ -109,9 +111,11 @@ fn fixture_environment_only_lists_live_claude_sessions() {
             waiting_reason: None,
             metadata: SessionMetadata {
                 cwd: Some("/fixtures/project-alpha".into()),
+                cwd_display: Some("fixtures/project-alpha".into()),
                 git_branch: Some("feat/alpha".into()),
                 model: Some("claude-sonnet-4-5-20250929".into()),
-                context_usage_percent: None,
+                context_tokens: Some(100),
+                context_usage_percent: Some(0.05),
             },
         }]
     );
@@ -158,7 +162,7 @@ fn one_live_process_only_keeps_the_most_recent_same_cwd_session() {
 
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].session_id, "active-session");
-    assert_eq!(sessions[0].state, SessionState::Idle);
+    assert_eq!(sessions[0].state, SessionState::Working);
     assert!(!sessions[0].needs_you());
 
     std::fs::remove_dir_all(&fixture_root).expect("temporary fixture should be removed");

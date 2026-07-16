@@ -4,6 +4,8 @@ use std::{
     path::Path,
 };
 
+use serde_json::Value;
+
 use crate::{
     Adapter, CoreError, CoreResult, Provider, ProviderDescriptor, Session, SessionArtifact,
     SessionMetadata, SessionState,
@@ -44,38 +46,117 @@ impl Adapter for ClaudeAdapter {
         })?;
         let mut metadata = SessionMetadata {
             cwd: None,
+            cwd_display: None,
             git_branch: None,
             model: None,
+            context_tokens: None,
             context_usage_percent: None,
         };
+        let mut state = SessionState::Working;
 
         for line in BufReader::new(file).lines() {
             let line = line.map_err(|source| CoreError::ReadPath {
                 path: path.to_path_buf(),
                 source,
             })?;
-            replace_string(&mut metadata.cwd, extract_json_string(&line, "cwd"));
-            replace_string(
-                &mut metadata.git_branch,
-                extract_json_string(&line, "gitBranch"),
-            );
-            replace_string(&mut metadata.model, extract_json_string(&line, "model"));
+            if let Ok(event) = serde_json::from_str::<Value>(&line) {
+                replace_json_string(&mut metadata.cwd, event.get("cwd"));
+                replace_json_string(&mut metadata.git_branch, event.get("gitBranch"));
+                replace_json_string(&mut metadata.model, event.pointer("/message/model"));
+                if event.get("type").and_then(Value::as_str) == Some("assistant") {
+                    state = if has_direct_waiting_tool(&event) {
+                        SessionState::Waiting
+                    } else {
+                        match event
+                            .pointer("/message/stop_reason")
+                            .and_then(Value::as_str)
+                        {
+                            Some("end_turn") => SessionState::Idle,
+                            _ => SessionState::Working,
+                        }
+                    };
+                } else if event.get("type").and_then(Value::as_str) == Some("user") {
+                    state = SessionState::Working;
+                }
+                if let Some(usage) = event.pointer("/message/usage") {
+                    let context_tokens = [
+                        "input_tokens",
+                        "cache_creation_input_tokens",
+                        "cache_read_input_tokens",
+                    ]
+                    .into_iter()
+                    .filter_map(|field| usage.get(field).and_then(Value::as_u64))
+                    .sum();
+                    metadata.context_tokens = Some(context_tokens);
+                }
+            }
         }
+
+        metadata.context_usage_percent = metadata
+            .model
+            .as_deref()
+            .and_then(claude_context_window)
+            .zip(metadata.context_tokens)
+            .map(|(window, tokens)| tokens as f32 / window as f32 * 100.0);
 
         if metadata.cwd.is_none() {
             metadata.cwd = path
                 .parent()
                 .map(|parent| parent.to_string_lossy().into_owned());
         }
+        metadata.cwd_display = metadata.cwd.as_deref().map(display_cwd);
 
         Ok(Session {
             provider: Self::PROVIDER,
             session_id,
-            // The walking skeleton deliberately avoids guessing Needs You.
-            state: SessionState::Idle,
+            state,
             waiting_reason: None,
             metadata,
         })
+    }
+}
+
+fn display_cwd(cwd: &str) -> String {
+    let components = Path::new(cwd)
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(value) => Some(value.to_string_lossy()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let start = components.len().saturating_sub(3);
+    components[start..].join("/")
+}
+
+fn has_direct_waiting_tool(event: &Value) -> bool {
+    event
+        .pointer("/message/content")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .any(|block| {
+            block.get("type").and_then(Value::as_str) == Some("tool_use")
+                && matches!(
+                    block.get("name").and_then(Value::as_str),
+                    Some("AskUserQuestion" | "ExitPlanMode")
+                )
+        })
+}
+
+fn claude_context_window(model: &str) -> Option<u64> {
+    match model {
+        "claude-opus-4-20250514"
+        | "claude-opus-4-0"
+        | "claude-sonnet-4-20250514"
+        | "claude-sonnet-4-0"
+        | "claude-sonnet-4-5-20250929"
+        | "claude-sonnet-4-5"
+        | "claude-haiku-4-5-20251001"
+        | "claude-haiku-4-5"
+        | "claude-3-7-sonnet-20250219"
+        | "claude-3-5-sonnet-20241022"
+        | "claude-3-5-haiku-20241022" => Some(200_000),
+        _ => None,
     }
 }
 
@@ -107,39 +188,8 @@ fn discover_jsonl(root: &Path, artifacts: &mut Vec<SessionArtifact>) -> CoreResu
     Ok(())
 }
 
-fn replace_string(target: &mut Option<String>, candidate: Option<String>) {
-    if let Some(value) = candidate {
-        *target = Some(value);
+fn replace_json_string(target: &mut Option<String>, candidate: Option<&Value>) {
+    if let Some(value) = candidate.and_then(Value::as_str) {
+        *target = Some(value.to_owned());
     }
-}
-
-/// Minimal string-field reader for the walking-skeleton fixtures and Claude JSONL.
-/// Full provider state parsing deliberately belongs to the follow-up Adapter slice.
-fn extract_json_string(document: &str, key: &str) -> Option<String> {
-    let needle = format!("\"{key}\"");
-    let key_end = document.find(&needle)? + needle.len();
-    let after_colon = document[key_end..]
-        .trim_start()
-        .strip_prefix(':')?
-        .trim_start();
-    let mut chars = after_colon.strip_prefix('"')?.chars();
-    let mut value = String::new();
-    while let Some(character) = chars.next() {
-        match character {
-            '"' => return Some(value),
-            '\\' => match chars.next()? {
-                '"' => value.push('"'),
-                '\\' => value.push('\\'),
-                '/' => value.push('/'),
-                'b' => value.push('\u{0008}'),
-                'f' => value.push('\u{000c}'),
-                'n' => value.push('\n'),
-                'r' => value.push('\r'),
-                't' => value.push('\t'),
-                _ => return None,
-            },
-            other => value.push(other),
-        }
-    }
-    None
 }

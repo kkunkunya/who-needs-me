@@ -3,8 +3,10 @@ type WaitingReason = "permissionApproval" | "answerQuestion" | "confirmPlan";
 
 interface SessionMetadata {
   cwd: string | null;
+  cwdDisplay: string | null;
   gitBranch: string | null;
   model: string | null;
+  contextTokens: number | null;
   contextUsagePercent: number | null;
 }
 

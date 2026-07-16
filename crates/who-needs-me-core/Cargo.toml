@@ -6,3 +6,6 @@ edition = "2024"
 [lib]
 name = "who_needs_me_core"
 path = "src/lib.rs"
+
+[dependencies]
+serde_json = "1"
