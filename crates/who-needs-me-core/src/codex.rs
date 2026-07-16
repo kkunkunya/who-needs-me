@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fs::{self, File},
     io::{BufRead, BufReader},
     path::Path,
@@ -60,6 +61,8 @@ impl Adapter for CodexAdapter {
         let mut state = None;
         let mut state_entered_at = None;
         let mut pending_waits = Vec::new();
+        let mut seen_call_ids = BTreeSet::new();
+        let mut ambiguous_call_ids = BTreeSet::new();
 
         for line in BufReader::new(file).lines() {
             let line = line.map_err(|source| CoreError::ReadPath {
@@ -101,7 +104,12 @@ impl Adapter for CodexAdapter {
                     }
                 }
                 Some("response_item") => {
-                    apply_tool_event(&event, &mut pending_waits);
+                    apply_tool_event(
+                        &event,
+                        &mut pending_waits,
+                        &mut seen_call_ids,
+                        &mut ambiguous_call_ids,
+                    );
                     if matches!(
                         event.pointer("/payload/type").and_then(Value::as_str),
                         Some("function_call" | "custom_tool_call")
@@ -132,11 +140,6 @@ impl Adapter for CodexAdapter {
             .filter(|window| *window > 0)
             .zip(metadata.context_tokens)
             .map(|(window, tokens)| tokens as f32 / window as f32 * 100.0);
-        if metadata.cwd.is_none() {
-            metadata.cwd = path
-                .parent()
-                .map(|parent| parent.to_string_lossy().into_owned());
-        }
         metadata.cwd_display = metadata.cwd.as_deref().map(display_cwd);
 
         Ok(Session {
@@ -150,25 +153,36 @@ impl Adapter for CodexAdapter {
     }
 }
 
-fn apply_tool_event(event: &Value, pending_waits: &mut Vec<(String, WaitingReason)>) {
+fn apply_tool_event(
+    event: &Value,
+    pending_waits: &mut Vec<(String, WaitingReason)>,
+    seen_call_ids: &mut BTreeSet<String>,
+    ambiguous_call_ids: &mut BTreeSet<String>,
+) {
     match event.pointer("/payload/type").and_then(Value::as_str) {
         Some("function_call" | "custom_tool_call") => {
             let Some(call_id) = event.pointer("/payload/call_id").and_then(Value::as_str) else {
                 return;
             };
+            if !seen_call_ids.insert(call_id.to_owned()) {
+                ambiguous_call_ids.insert(call_id.to_owned());
+                pending_waits.retain(|(pending_id, _)| pending_id != call_id);
+                return;
+            }
             let reason = match event.pointer("/payload/name").and_then(Value::as_str) {
                 Some("request_user_input") => WaitingReason::AnswerQuestion,
                 Some("update_plan") => WaitingReason::ConfirmPlan,
                 _ => return,
             };
-            pending_waits.retain(|(pending_id, _)| pending_id != call_id);
             pending_waits.push((call_id.to_owned(), reason));
         }
         Some("function_call_output" | "custom_tool_call_output") => {
             let Some(call_id) = event.pointer("/payload/call_id").and_then(Value::as_str) else {
                 return;
             };
-            pending_waits.retain(|(pending_id, _)| pending_id != call_id);
+            if !ambiguous_call_ids.contains(call_id) {
+                pending_waits.retain(|(pending_id, _)| pending_id != call_id);
+            }
         }
         _ => {}
     }
@@ -194,11 +208,36 @@ fn discover_jsonl(root: &Path, artifacts: &mut Vec<SessionArtifact>) -> CoreResu
         })?;
         if file_type.is_dir() {
             discover_jsonl(&path, artifacts)?;
-        } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "jsonl") {
+        } else if file_type.is_file()
+            && path.extension().is_some_and(|ext| ext == "jsonl")
+            && is_codex_cli_rollout(&path)?
+        {
             artifacts.push(SessionArtifact::from_path(path));
         }
     }
     Ok(())
+}
+
+fn is_codex_cli_rollout(path: &Path) -> CoreResult<bool> {
+    let file = File::open(path).map_err(|source| CoreError::ReadPath {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    for line in BufReader::new(file).lines() {
+        let line = line.map_err(|source| CoreError::ReadPath {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        let Ok(event) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        if event.get("type").and_then(Value::as_str) == Some("session_meta") {
+            return Ok(
+                event.pointer("/payload/originator").and_then(Value::as_str) == Some("codex-tui")
+            );
+        }
+    }
+    Ok(false)
 }
 
 fn replace_json_string(target: &mut Option<String>, candidate: Option<&Value>) {

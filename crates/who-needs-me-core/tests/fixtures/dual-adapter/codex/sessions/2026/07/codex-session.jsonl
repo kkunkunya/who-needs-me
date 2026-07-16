@@ -1,0 +1,4 @@
+{"timestamp":"2026-07-15T10:00:00Z","type":"session_meta","payload":{"id":"codex-session","originator":"codex-tui","cwd":"/fixtures/shared-project","git":{"branch":"main"}}}
+{"timestamp":"2026-07-15T10:00:01Z","type":"event_msg","payload":{"type":"task_started"}}
+{"timestamp":"2026-07-15T10:00:02Z","type":"turn_context","payload":{"cwd":"/fixtures/shared-project","model":"gpt-5.6-sol"}}
+{"timestamp":"2026-07-15T10:00:03Z","type":"event_msg","payload":{"type":"task_complete"}}

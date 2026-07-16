@@ -21,6 +21,24 @@ fn fixture(name: &str) -> SessionArtifact {
 }
 
 #[test]
+fn discovery_keeps_only_concrete_codex_cli_rollouts() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/codex/discovery");
+
+    let artifacts = CodexAdapter
+        .discover(&root)
+        .expect("Codex discovery fixture should be readable");
+
+    assert_eq!(artifacts.len(), 1);
+    assert_eq!(
+        artifacts[0]
+            .path()
+            .file_name()
+            .and_then(|name| name.to_str()),
+        Some("cli.jsonl")
+    );
+}
+
+#[test]
 fn completed_codex_turn_is_idle_with_display_metadata() {
     let session = CodexAdapter
         .parse(&fixture("idle-completed-turn.jsonl"))
@@ -97,6 +115,26 @@ fn unknown_lifecycle_format_does_not_reuse_a_stale_idle_state() {
 }
 
 #[test]
+fn missing_or_malformed_cwd_is_not_replaced_with_a_rollout_directory() {
+    let missing = CodexAdapter
+        .parse(&fixture("missing-cwd.jsonl"))
+        .expect("missing-cwd fixture should parse");
+    let malformed = CodexAdapter
+        .parse(&fixture("unknown-lifecycle-format.jsonl"))
+        .expect("malformed-cwd fixture should parse");
+
+    assert_eq!(
+        (
+            missing.metadata.cwd,
+            missing.metadata.cwd_display,
+            malformed.metadata.cwd,
+            malformed.metadata.cwd_display,
+        ),
+        (None, None, None, None)
+    );
+}
+
+#[test]
 fn unfinished_ordinary_tool_call_remains_working_without_a_hook() {
     let session = CodexAdapter
         .parse(&fixture("working-ordinary-tool.jsonl"))
@@ -112,6 +150,17 @@ fn semantic_tools_without_call_ids_remain_conservatively_working() {
     let session = CodexAdapter
         .parse(&fixture("missing-id-semantic-tools.jsonl"))
         .expect("missing-id fixture should parse");
+
+    assert_eq!(session.state, SessionState::Working);
+    assert_eq!(session.waiting_reason, None);
+    assert!(!session.needs_you());
+}
+
+#[test]
+fn duplicate_call_ids_do_not_fabricate_a_semantic_wait() {
+    let session = CodexAdapter
+        .parse(&fixture("duplicate-call-id.jsonl"))
+        .expect("duplicate call-id fixture should parse");
 
     assert_eq!(session.state, SessionState::Working);
     assert_eq!(session.waiting_reason, None);
