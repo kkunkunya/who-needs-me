@@ -22,7 +22,7 @@ _Avoid_: 空闲等待（易与 Waiting 混淆）
 CLI 进程或 session 已经结束的状态。
 
 **Needs You**:
-"该 session 正在等用户交互"的布尔标志。判定宁缺毋滥：不确定时不点亮，绝不把 Idle 错报成 Waiting。
+"该 session 正在等用户交互"的布尔标志。判定宁缺毋滥：只有能唯一识别并配对的直接 Session 信号才点亮；不确定时不点亮，绝不把 Idle 错报成 Waiting。语义工具事件缺少 `tool_use.id`（工具调用标识）时无法可靠判断后续是否已有对应结果，按标准状态折叠为 Working，不点亮 Needs You。（ADR-0006）
 
 ## 采集
 
