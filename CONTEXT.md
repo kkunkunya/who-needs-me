@@ -26,6 +26,11 @@ CLI 进程或 session 已经结束的状态。
 
 ## 采集
 
+**Observer**:
+WhoNeedsMe 的采集角色：发现并读取用户已经独立启动的 Provider 会话与进程，不负责启动、托管或控制这些 CLI。Hook 只增强采集精度，不改变这一边界。（ADR-0002）
+_中文_: 旁观者
+_Avoid_: Supervisor、进程托管器
+
 **Provider**:
 WhoNeedsMe 支持的一款具体 coding agent CLI 工具，如 Claude Code、Codex CLI；每接入一个新 Provider 就新增一个 Adapter，不改动核心状态机与 UI。（ADR-0003）
 
@@ -38,6 +43,10 @@ _Avoid_: 会话文件底座（旧称，ADR-0003 已泛化为不限存储形式�
 
 **沉默 hook**:
 只追加写本地事件文件、不向 Agent 上下文输出任何内容、正常退出的 hook。本项目所有 hooks 的硬约束——对 Agent 的认知负担必须为零；是否提供由各 Provider 的 Adapter 自行决定，并非所有 Provider 都要有。（ADR-0002、ADR-0003）
+
+**关联置信度**:
+系统内部判断候选 Session 与活进程对应关系把握程度的诊断信息；直接 Session 级信号可形成精确关联，仅有 Provider + cwd（工作目录）时属于推断关联。它只用于筛选、降级和诊断，绝不作为 Session 行上的用户标签。（ADR-0007）
+_Avoid_: 关联不确定（面向用户的文案）、数据可能不准
 
 ## 呈现
 

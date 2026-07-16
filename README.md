@@ -21,4 +21,4 @@ cargo test
 WHO_NEEDS_ME_FIXTURE_ROOT=crates/who-needs-me-core/tests/fixtures/claude cargo tauri dev
 ```
 
-不设置 `WHO_NEEDS_ME_FIXTURE_ROOT` 时，生产 `Environment` 默认读取 Claude/Codex 的官方本机会话根，并使用真实进程存活探针；测试与手工验收可显式注入 fixture 根和受控探针。
+不设置 `WHO_NEEDS_ME_FIXTURE_ROOT` 时，当前 walking skeleton 的生产 `Environment` 默认读取 Claude Code 的本机会话根，并使用真实进程存活探针；测试与手工验收可显式注入 fixture 根和受控探针。Codex Adapter 将在后续 Provider 接入片实现。

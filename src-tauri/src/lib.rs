@@ -108,8 +108,8 @@ fn runtime_environment(adapters: &[Box<dyn Adapter>]) -> CoreResult<Environment>
 struct FixtureProcessProbe;
 
 impl ProcessProbe for FixtureProcessProbe {
-    fn is_alive(&self, _provider: ProviderDescriptor, _cwd: &Path) -> bool {
-        true
+    fn live_process_count(&self, _provider: ProviderDescriptor, _cwd: &Path) -> usize {
+        1
     }
 }
 

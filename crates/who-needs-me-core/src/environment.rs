@@ -9,7 +9,11 @@ use crate::{CoreError, CoreResult, Provider, ProviderDescriptor};
 
 /// The OS boundary used to decide whether a Provider process is still alive.
 pub trait ProcessProbe: Send + Sync {
-    fn is_alive(&self, provider: ProviderDescriptor, cwd: &Path) -> bool;
+    /// Number of live Provider processes whose working directory matches `cwd`.
+    ///
+    /// The Engine uses this as a per-directory capacity: N processes may keep at
+    /// most N recently active Session candidates on the panel.
+    fn live_process_count(&self, provider: ProviderDescriptor, cwd: &Path) -> usize;
 }
 
 /// A snapshot of process working directories, isolated for deterministic probing.
@@ -37,13 +41,16 @@ impl SystemProcessProbe {
 }
 
 impl ProcessProbe for SystemProcessProbe {
-    fn is_alive(&self, provider: ProviderDescriptor, cwd: &Path) -> bool {
-        !cwd.as_os_str().is_empty()
-            && self
-                .process_table
-                .process_cwds(provider.executable())
-                .iter()
-                .any(|process_cwd| paths_match(process_cwd, cwd))
+    fn live_process_count(&self, provider: ProviderDescriptor, cwd: &Path) -> usize {
+        if cwd.as_os_str().is_empty() {
+            return 0;
+        }
+
+        self.process_table
+            .process_cwds(provider.executable())
+            .iter()
+            .filter(|process_cwd| paths_match(process_cwd, cwd))
+            .count()
     }
 }
 
@@ -206,10 +213,16 @@ mod tests {
             "claude",
         );
 
-        assert!(probe.is_alive(provider, PathBuf::from("/work/live-session").as_path()));
-        assert!(!probe.is_alive(
-            provider,
-            PathBuf::from("/work/historical-session").as_path()
-        ));
+        assert_eq!(
+            probe.live_process_count(provider, PathBuf::from("/work/live-session").as_path()),
+            1
+        );
+        assert_eq!(
+            probe.live_process_count(
+                provider,
+                PathBuf::from("/work/historical-session").as_path()
+            ),
+            0
+        );
     }
 }
