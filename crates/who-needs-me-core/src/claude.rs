@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::{
     Adapter, CoreError, CoreResult, Provider, ProviderDescriptor, Session, SessionArtifact,
-    SessionMetadata, SessionState,
+    SessionMetadata, SessionState, WaitingReason,
 };
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -56,6 +56,7 @@ impl Adapter for ClaudeAdapter {
         };
         let mut state = None;
         let mut state_entered_at = None;
+        let mut pending_waits = Vec::new();
 
         for line in BufReader::new(file).lines() {
             let line = line.map_err(|source| CoreError::ReadPath {
@@ -104,6 +105,7 @@ impl Adapter for ClaudeAdapter {
                     .sum();
                     metadata.context_tokens = Some(context_tokens);
                 }
+                apply_semantic_waiting_events(&event, &mut pending_waits);
             }
         }
 
@@ -122,12 +124,18 @@ impl Adapter for ClaudeAdapter {
         metadata.cwd_display = metadata.cwd.as_deref().map(display_cwd);
         let state = state.unwrap_or(SessionState::Working);
 
+        let waiting_reason = pending_waits.last().map(|(_, reason)| *reason);
+
         Ok(Session {
             provider: Self::PROVIDER,
             session_id,
-            state,
+            state: if waiting_reason.is_some() {
+                SessionState::Waiting
+            } else {
+                state
+            },
             state_entered_at,
-            waiting_reason: None,
+            waiting_reason,
             metadata,
         })
     }
@@ -180,6 +188,36 @@ fn claude_context_window(model: &str) -> Option<u64> {
         | "claude-3-5-sonnet-20241022"
         | "claude-3-5-haiku-20241022" => Some(200_000),
         _ => None,
+    }
+}
+
+fn apply_semantic_waiting_events(event: &Value, pending_waits: &mut Vec<(String, WaitingReason)>) {
+    let Some(content) = event.pointer("/message/content").and_then(Value::as_array) else {
+        return;
+    };
+
+    for block in content {
+        match block.get("type").and_then(Value::as_str) {
+            Some("tool_use") => {
+                let Some(tool_use_id) = block.get("id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let reason = match block.get("name").and_then(Value::as_str) {
+                    Some("AskUserQuestion") => WaitingReason::AnswerQuestion,
+                    Some("ExitPlanMode") => WaitingReason::ConfirmPlan,
+                    _ => continue,
+                };
+                pending_waits.retain(|(pending_id, _)| pending_id != tool_use_id);
+                pending_waits.push((tool_use_id.to_owned(), reason));
+            }
+            Some("tool_result") => {
+                let Some(tool_use_id) = block.get("tool_use_id").and_then(Value::as_str) else {
+                    continue;
+                };
+                pending_waits.retain(|(pending_id, _)| pending_id != tool_use_id);
+            }
+            _ => {}
+        }
     }
 }
 
