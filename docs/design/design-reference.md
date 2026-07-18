@@ -188,11 +188,12 @@
 
 ### 10.2 必备素材
 
-> **2026-07-17 栅格化**：改为 gpt-image-2 栅格母版（character sheet 作 `--ref`）经 `/produce-assets` 抠透明底 + resize；不再手画分层 SVG，Tray 不再要求 template 单色。
+> **2026-07-17 栅格化**：compact / illustration 改为 gpt-image-2 栅格母版（character sheet 作 `--ref`）经 `/produce-assets` 抠透明底 + resize；不再手画分层 SVG。
+> **2026-07-18 Tray micro 回退 template**：实机确认浅色菜单栏上浅猫栅格几乎隐形，且单张定色栅格无法同时适配浅+深两栏；micro 三态改为 SVG 几何派生的极简头+耳剪影 PNG，calm/working 纯黑+alpha 走 macOS template image（系统自动反色），attention 保留 coral 非 template。仅 micro 走此路，compact/illustration 仍全色栅格。
 
 | Detail level | Surface | States | Master | Runtime |
 |---|---|---|---|---|
-| micro | Tray | calm / working / attention | gpt-image-2 raster master | 全色栅格透明 PNG @1x/@2x（含 attention coral） |
+| micro | Tray | calm / working / attention | SVG 几何派生（`scripts/build-micro-template.py`） | 极简剪影 PNG @1x/@2x；calm/working 黑+alpha template，attention coral 非 template |
 | compact | Panel Header | calm / working / attention | gpt-image-2 raster master | 透明 WebP @1x/@2x |
 | compact | Alert Card | attention | same compact character | 复用 compact attention WebP |
 | illustration | Empty State | sleeping calm | gpt-image-2 raster master | 透明 WebP @1x/@2x |
@@ -234,8 +235,9 @@
 
 ### Tray Icon
 
-- calm / working / attention 三张全色栅格透明 PNG（非 template 单色）；attention 带 coral 强调。
-- 已接受风险：全色栅格在浅色菜单栏重着色不如 template 干净——Kun 明确选择全栅格，实机由 Kun 验证。
+- calm / working 为纯黑+alpha 的 macOS **template image**（系统按浅/深菜单栏自动反色，两栏均清晰）；attention 为暖珊瑚 `#F05A5D` 非 template。三态靠耳姿（放松 vs 竖起）+眼型（闭合 vs 睁开）+ accent 区分。
+- 运行时需把 calm/working 图标标记为 template（Tauri `set_icon_as_template(true)` / `NSImage.isTemplate`）；attention 不标记为 template。
+- 对比预览（浅+深栏 18px/36px）：`artifacts/design-qa/cat-assets/tray-menubar-preview-v2.png`；实机 macOS menu bar 截图仍由 Kun 补。
 - Tooltip 只解释 aggregate state；点击一律开 Panel。
 
 ## 12. 备注
