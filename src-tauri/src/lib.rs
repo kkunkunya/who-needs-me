@@ -3,8 +3,8 @@ use std::{path::Path, sync::Arc};
 use serde::Serialize;
 use tauri::{State, image::Image, tray::TrayIconBuilder};
 use who_needs_me_core::{
-    Adapter, ClaudeAdapter, CoreResult, Engine, Environment, ProcessProbe, ProviderDescriptor,
-    Session, SessionMetadata, SessionState, WaitingReason,
+    Adapter, ClaudeAdapter, CodexAdapter, CoreResult, Engine, Environment, ProcessProbe,
+    ProviderDescriptor, Session, SessionMetadata, SessionState, WaitingReason,
 };
 
 struct AppState {
@@ -55,7 +55,7 @@ fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionView>, String>
 }
 
 pub fn run() {
-    let adapters: Vec<Box<dyn Adapter>> = vec![Box::new(ClaudeAdapter)];
+    let adapters: Vec<Box<dyn Adapter>> = vec![Box::new(ClaudeAdapter), Box::new(CodexAdapter)];
     let environment =
         runtime_environment(&adapters).expect("WhoNeedsMe environment should be available");
     let state = AppState {
@@ -97,12 +97,20 @@ fn runtime_environment(adapters: &[Box<dyn Adapter>]) -> CoreResult<Environment>
             .join(fixture_root)
     };
 
+    fixture_environment(adapters, &fixture_root)
+}
+
+fn fixture_environment(
+    adapters: &[Box<dyn Adapter>],
+    fixture_root: &Path,
+) -> CoreResult<Environment> {
     let mut builder = Environment::builder(Arc::new(FixtureProcessProbe));
     for adapter in adapters {
         let provider = adapter.descriptor().provider();
+        let provider_root = fixture_root.join(provider.id());
         builder = builder
-            .with_session_data_root(provider, fixture_root.join("sessions"))
-            .with_hook_event_root(provider, fixture_root.join("hooks"));
+            .with_session_data_root(provider, provider_root.join("sessions"))
+            .with_hook_event_root(provider, provider_root.join("hooks"));
     }
     builder.build()
 }
@@ -155,5 +163,52 @@ fn metadata_view(metadata: SessionMetadata) -> SessionMetadataView {
         model: metadata.model,
         context_tokens: metadata.context_tokens,
         context_usage_percent: metadata.context_usage_percent,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::Path, time::SystemTime};
+
+    use super::*;
+
+    #[test]
+    fn fixture_runtime_keeps_provider_roots_isolated_through_the_panel_seam() {
+        let adapters: Vec<Box<dyn Adapter>> = vec![Box::new(ClaudeAdapter), Box::new(CodexAdapter)];
+        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../crates/who-needs-me-core/tests/fixtures/dual-adapter");
+        let environment = fixture_environment(&adapters, &fixture_root)
+            .expect("dual-adapter fixture environment should build");
+
+        let panel = Engine::new(adapters)
+            .collect_panel_at(&environment, SystemTime::UNIX_EPOCH)
+            .expect("dual-adapter fixtures should reach a PanelSnapshot");
+        let sessions = panel
+            .sessions
+            .into_iter()
+            .map(|entry| {
+                (
+                    entry.session.provider.id(),
+                    entry.session.session_id,
+                    entry.session.metadata.cwd,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            sessions,
+            vec![
+                (
+                    "claude",
+                    "claude-session".to_owned(),
+                    Some("/fixtures/shared-project".to_owned()),
+                ),
+                (
+                    "codex",
+                    "codex-session".to_owned(),
+                    Some("/fixtures/shared-project".to_owned()),
+                ),
+            ]
+        );
     }
 }

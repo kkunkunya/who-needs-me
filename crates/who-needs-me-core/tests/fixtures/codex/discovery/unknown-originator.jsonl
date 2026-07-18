@@ -1,0 +1,2 @@
+{"timestamp":"2026-07-15T00:30:01Z","type":"session_meta","payload":{"id":"codex-unknown-originator","cwd":"/fixtures/shared-cwd","git":{"branch":"main"}}}
+{"timestamp":"2026-07-15T00:30:02Z","type":"event_msg","payload":{"type":"task_started"}}
