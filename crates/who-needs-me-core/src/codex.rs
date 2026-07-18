@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File},
     io::{BufRead, BufReader},
     path::Path,
@@ -16,6 +16,12 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CodexAdapter;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CallVariant {
+    Function,
+    CustomTool,
+}
 
 impl CodexAdapter {
     pub const PROVIDER: Provider = Provider::new("codex", "Codex");
@@ -61,7 +67,8 @@ impl Adapter for CodexAdapter {
         let mut state = None;
         let mut state_entered_at = None;
         let mut pending_waits = Vec::new();
-        let mut seen_call_ids = BTreeSet::new();
+        let mut seen_calls = BTreeMap::new();
+        let mut seen_outputs = BTreeMap::new();
         let mut ambiguous_call_ids = BTreeSet::new();
 
         for line in BufReader::new(file).lines() {
@@ -107,7 +114,8 @@ impl Adapter for CodexAdapter {
                     apply_tool_event(
                         &event,
                         &mut pending_waits,
-                        &mut seen_call_ids,
+                        &mut seen_calls,
+                        &mut seen_outputs,
                         &mut ambiguous_call_ids,
                     );
                     if matches!(
@@ -156,17 +164,25 @@ impl Adapter for CodexAdapter {
 fn apply_tool_event(
     event: &Value,
     pending_waits: &mut Vec<(String, WaitingReason)>,
-    seen_call_ids: &mut BTreeSet<String>,
+    seen_calls: &mut BTreeMap<String, CallVariant>,
+    seen_outputs: &mut BTreeMap<String, CallVariant>,
     ambiguous_call_ids: &mut BTreeSet<String>,
 ) {
     match event.pointer("/payload/type").and_then(Value::as_str) {
-        Some("function_call" | "custom_tool_call") => {
+        Some(call_type @ ("function_call" | "custom_tool_call")) => {
             let Some(call_id) = event.pointer("/payload/call_id").and_then(Value::as_str) else {
                 return;
             };
-            if !seen_call_ids.insert(call_id.to_owned()) {
+            let variant = call_variant(call_type);
+            if seen_calls.insert(call_id.to_owned(), variant).is_some() {
                 ambiguous_call_ids.insert(call_id.to_owned());
                 pending_waits.retain(|(pending_id, _)| pending_id != call_id);
+                return;
+            }
+            if let Some(output_variant) = seen_outputs.get(call_id) {
+                if *output_variant != variant {
+                    ambiguous_call_ids.insert(call_id.to_owned());
+                }
                 return;
             }
             let reason = match event.pointer("/payload/name").and_then(Value::as_str) {
@@ -176,15 +192,31 @@ fn apply_tool_event(
             };
             pending_waits.push((call_id.to_owned(), reason));
         }
-        Some("function_call_output" | "custom_tool_call_output") => {
+        Some(output_type @ ("function_call_output" | "custom_tool_call_output")) => {
             let Some(call_id) = event.pointer("/payload/call_id").and_then(Value::as_str) else {
                 return;
             };
-            if !ambiguous_call_ids.contains(call_id) {
-                pending_waits.retain(|(pending_id, _)| pending_id != call_id);
+            let variant = call_variant(output_type);
+            if seen_outputs.insert(call_id.to_owned(), variant).is_some() {
+                ambiguous_call_ids.insert(call_id.to_owned());
             }
+            if seen_calls
+                .get(call_id)
+                .is_some_and(|call_variant| *call_variant != variant)
+            {
+                ambiguous_call_ids.insert(call_id.to_owned());
+            }
+            pending_waits.retain(|(pending_id, _)| pending_id != call_id);
         }
         _ => {}
+    }
+}
+
+fn call_variant(event_type: &str) -> CallVariant {
+    match event_type {
+        "function_call" | "function_call_output" => CallVariant::Function,
+        "custom_tool_call" | "custom_tool_call_output" => CallVariant::CustomTool,
+        _ => unreachable!("call_variant only receives recognized response item types"),
     }
 }
 

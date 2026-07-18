@@ -101,6 +101,39 @@ fn matching_function_output_clears_a_semantic_wait() {
 }
 
 #[test]
+fn matching_custom_output_clears_a_custom_semantic_wait() {
+    let session = CodexAdapter
+        .parse(&fixture("resolved-custom-question.jsonl"))
+        .expect("resolved custom question fixture should parse");
+
+    assert_eq!(session.state, SessionState::Working);
+    assert_eq!(session.waiting_reason, None);
+    assert!(!session.needs_you());
+}
+
+#[test]
+fn mismatched_output_variant_degrades_without_fabricating_a_wait() {
+    let session = CodexAdapter
+        .parse(&fixture("mismatched-output-variant.jsonl"))
+        .expect("mismatched output fixture should parse");
+
+    assert_eq!(session.state, SessionState::Working);
+    assert_eq!(session.waiting_reason, None);
+    assert!(!session.needs_you());
+}
+
+#[test]
+fn matching_function_output_before_a_question_does_not_fabricate_a_wait() {
+    let session = CodexAdapter
+        .parse(&fixture("output-before-question.jsonl"))
+        .expect("out-of-order question fixture should parse");
+
+    assert_eq!(session.state, SessionState::Working);
+    assert_eq!(session.waiting_reason, None);
+    assert!(!session.needs_you());
+}
+
+#[test]
 fn unknown_lifecycle_format_does_not_reuse_a_stale_idle_state() {
     let session = CodexAdapter
         .parse(&fixture("unknown-lifecycle-format.jsonl"))
