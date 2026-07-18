@@ -7,6 +7,7 @@
     "build:ui": "node scripts/prepare-ui.mjs && tsc --project tsconfig.json",
     "check:ui": "tsc --project tsconfig.json --noEmit",
     "check:design": "node scripts/check-design-contract.mjs",
+    "check:cat-assets": "node scripts/check-cat-assets.mjs",
     "check:debug-surface": "npm run build:ui && node --test ui/debug-surface.test.mjs",
     "test": "npm run check:ui && npm run check:design && npm run check:debug-surface"
   },
