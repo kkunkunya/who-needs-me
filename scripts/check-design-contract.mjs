@@ -1,27 +1,38 @@
 import { readFile } from "node:fs/promises";
 
 const css = await readFile(new URL("../ui/styles.css", import.meta.url), "utf8");
-const requiredTokens = new Map([
-  ["bg-panel", "#1C1C1E"],
-  ["border-hairline", "rgba(255,255,255,0.08)"],
-  ["text-primary", "#ECECEC"],
-  ["text-secondary", "#8A8A8E"],
-  ["text-mono", "#A8A8AD"],
-  ["text-disabled", "#5A5A5E"],
-  ["state-working", "#7C7C82"],
-  ["state-idle", "#5A5A5E"],
-  ["state-ended", "#48484C"],
-]);
+const designReference = await readFile(
+  new URL("../docs/design/design-reference.md", import.meta.url),
+  "utf8",
+);
+const requiredTokens = [
+  "color-bg-panel",
+  "color-border-hairline",
+  "color-text-primary",
+  "color-text-secondary",
+  "color-text-mono",
+  "color-text-disabled",
+  "color-state-working",
+  "color-state-idle",
+  "color-state-ended",
+];
 
-for (const [name, value] of requiredTokens) {
+for (const name of requiredTokens) {
+  const sourcePattern = new RegExp("`--" + name + ": ([^`]+)`");
+  const sourceMatch = designReference.match(sourcePattern);
+  if (!sourceMatch) {
+    throw new Error(`design-reference.md token is missing: --${name}`);
+  }
+
+  const value = sourceMatch[1];
   const declaration = `--${name}: ${value};`;
   if (!css.includes(declaration)) {
-    throw new Error(`DESIGN.md token is missing or changed: ${declaration}`);
+    throw new Error(`Token consumer is missing or changed: ${declaration}`);
   }
 }
 
-if (css.toUpperCase().includes("#E39B3E")) {
-  throw new Error("The throwaway debug list must not use Needs-You amber");
+if (css.toUpperCase().includes("#F05A5D")) {
+  throw new Error("The throwaway debug list must not use the Needs-You coral signal");
 }
 
-console.log("DESIGN.md contract: debug surface is neutral and token-aligned");
+console.log("Design contract: debug surface is neutral and token-source aligned");
